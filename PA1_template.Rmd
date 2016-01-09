@@ -1,25 +1,125 @@
 ---
 title: "Reproducible Research: Peer Assessment 1"
+subtitle: "Author: Matt Frei"
 output: 
   html_document:
     keep_md: true
 ---
 
+This document constituted my submission for the first assignment for Reproducible Research. In this assignment, we load, process, and perform some basic analysis on personal movement data collected from one anoymous individual.
 
-## Loading and preprocessing the data
+## Step 1: Loading and preprocessing the data
+* Set work directory to location of repo cloned from [github](https://github.com/rdpeng/RepData_PeerAssessment1).
+* Read in data
+* Convert dates to Date objects
+* Display first few rows:
+```{r}
+setwd('C:/Users/matt/Dropbox/Documents/Coursera/reproducible research/RepData_PeerAssessment1')
+activity <- read.csv('activity.csv')
+activity$date <- as.Date(activity$date)
+head(activity)
+```
 
 
-
-## What is mean total number of steps taken per day?
-
+## Step 2: What is mean total number of steps taken per day?
+* Calculate the total number of steps taken for each day
+* Plot the distribution of the daily totals:
+```{r}
+steps <- tapply(activity$steps,activity$date,sum)
+hist(steps,breaks=50,
+     main = 'Distribution of Daily Step Totals',
+     xlab = 'Steps',
+     ylab = 'Days')
+```
+Calculate the mean number of daily steps:
+```{r}
+mean(steps,na.rm=TRUE)
+```
+Calculate the median number of daily steps:
+```{r}
+median(steps,na.rm=TRUE)
+```
 
 
 ## What is the average daily activity pattern?
-
-
+* Calculate the average number of steps at each interval across all days
+* Creates a dataframe showing which intervals each mean is associated with
+* Plot the average number of steps by intervals
+```{r}
+interval.steps <- tapply(activity$steps,activity$interval,mean,na.rm=TRUE)
+interval <- unique(activity$interval)
+intervalDF <- as.data.frame(cbind(interval,interval.steps))
+plot(intervalDF$interval,intervalDF$interval.steps, type = 'l',
+     main='Average Steps By 5 Minute Interval',
+     xlab='Interval',
+     ylab='Average Steps')
+```
+Find interval with highest average number of steps:
+```{r}
+interval[max(interval.steps)]
+```
 
 ## Imputing missing values
+Calculate number of days with missing values:
+```{r}
+sum(is.na(activity$steps))
+```
 
+Let's also verify that the other columns have no missing values:
+```{r}
+sum(!complete.cases(activity))
+```
 
+Replace missing values with the average for the applicable interval:
+     * Load the zoo package
+     * Use the na.aggregate function to impute the means
+     * Verify that there are no missing values:
+```{r}
+library(zoo)
+no.Nas <- na.aggregate(activity$steps,activity$interval,mean,na.rm=TRUE)
+activity.noNas <- activity
+activity.noNas$steps <- no.Nas
+sum(!complete.cases(activity.noNas))
+```
+Plot the distribution of steps per day with missing values imputed:
+```{r}
+steps.noNa <- tapply(activity.noNas$steps,activity.noNas$date,sum)
+hist(steps.noNa,breaks=50,
+     main = 'Distribution of Imputed Daily Step Totals',
+     xlab = 'Steps (NAs Imputed)',
+     ylab = 'Days')
+```
+Yes, the distribution looks a bit different than it did before the imputation was performed. There is no more mass in the center of the distribution.
 
+Calculate the mean number of daily steps:
+```{r}
+mean(steps.noNa,na.rm=TRUE)
+```
+Calculate the median number of daily steps:
+```{r}
+median(steps.noNa,na.rm=TRUE)
+```
+The mean is unchanged and the media increased only slighty.
 ## Are there differences in activity patterns between weekdays and weekends?
+* Write a function to produce a boolean separating weekends from weekdays
+* Calculate the average number of steps for each interval separaly for weekdays and weekends
+* Plot The averages to compare weekends and weekdays
+```{r}
+week <- function(day){
+     if(weekdays(day) %in% c('Friday','Saturday','Sunday')){
+          'weekend'
+     }
+     else{
+          'weekday'
+     }
+}
+library(dplyr)
+activity.noNas$week.days <- sapply(activity.noNas$date,week)
+library(lattice)
+week.int <- activity.noNas %>% group_by(interval,week.days) %>% summarise_each(funs(mean),steps)
+xyplot(week.int$steps~week.int$interval|week.int$week.days,type='l',layout = c(1,2),
+       main = 'Average Steps at Interval:\nWeekends vs. Weekdays',
+       xlab = 'Interval',
+       ylab = 'Average Steps')
+```
+On average, more steps are taken in the morning on the weekdays but more steps are taken in the afternoons on the weekends.
